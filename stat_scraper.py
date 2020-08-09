@@ -22,10 +22,10 @@ def get_active_players_by_letter(letter: str) -> PlayerList:
     table = soup.find('table')
     active_players_strong = table.find_all('strong')
     for strong in active_players_strong:
-        player = strong.a.string
+        player_name = strong.a.string
         player_id = strong.a.get("href")
         player_id = player_id[11:player_id.index('.')]
-        player_list.append((player_id, player))
+        player_list.append((player_id, player_name))
 
     return player_list
 
@@ -37,4 +37,4 @@ def get_active_players() -> PlayerList:
 
     return player_list
 
-print(get_active_players())
+print(get_active_players_by_letter('a'))
