@@ -68,7 +68,7 @@ def create_table(conn, create_table_sql):
 
 def create_players_database():
     
-    database = r"D:\\12 GitHub\\NBADailyFantasy\\NBADailyFantasy.db" #might need another path for jon
+    database = r"D:\\13-SQLite\\NBADailyFantasy\\NBADailyFantasy.db" #might need another path for jon
     
     sql_create_players_table = """ CREATE TABLE IF NOT EXISTS players (
         id integer PRIMARY KEY,
