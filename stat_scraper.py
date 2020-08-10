@@ -2,13 +2,12 @@ from bs4 import BeautifulSoup
 from string import ascii_lowercase
 import urllib.request
 from typing import List, Tuple
-
-import sqlite3 #added for sql
-from sqlite3 import Error #added for sql
+from dbmanager import DbManager
 
 PlayerInfo = Tuple[str, str]  # player_id, name
 PlayerList = List[PlayerInfo]
 
+NBA_DB_NAME = "nba.db"
 BASKETBALL_REFERENCE_BASE_URL = "https://www.basketball-reference.com/"
 BASKETBALL_REFERENCE_PLAYERS_BASE_URL = BASKETBALL_REFERENCE_BASE_URL + "players/"
 
@@ -39,57 +38,24 @@ def get_active_players() -> PlayerList:
 
     return player_list
 
-#Daniel edit for sql code
-
-def create_connection(db_file):
-    """ create a database connection to the SQLite database
-        specified by db_file
-    :param db_file: database file
-    :return: Connection object or None
-    """
-    try:
-        conn = sqlite3.connect(db_file)
-        return conn
-    except Error as e:
-        print(e)
-    return conn
-
-def create_table(conn, create_table_sql):
-    """ create a table from the create_table_sql statement
-    :param conn: Connection object
-    :param create_table_sql: a CREATE TABLE statement
-    :return:
-    """
-    try:
-        c = conn.cursor()
-        c.execute(create_table_sql)
-    except Error as e:
-        print(e)
-
 def create_players_database():
-    
-    database = r"D:\\13-SQLite\\NBADailyFantasy\\NBADailyFantasy.db" #might need another path for jon
-    
-    sql_create_players_table = """ CREATE TABLE IF NOT EXISTS players (
-        id integer PRIMARY KEY,
-        name text NOT NULL, 
-        href text NOT NULL
-        ); """
-        
-    # create a database connection
-    conn = create_connection(database)
+    dbManager = DbManager(NBA_DB_NAME)  
+    if dbManager is None:
+        print("Error creating connection to DB")
+        return
 
-    # create tables
-    if conn is not None:
-        # create projects table
-        create_table(conn, sql_create_players_table)
+    sql_create_players_table = """
+        CREATE TABLE IF NOT EXISTS players (
+        id   text PRIMARY KEY,
+        name text NOT NULL); """
 
-    else:
-        print("Error! cannot create the database connection.")
+    if dbManager.execute(sql_create_players_table) is None:
+        print("Error creating table")
 
 def update_players_database():
     return
 
-#end Daniel edits
 
-#print(get_active_players()) #Daniel modified this line to test for all players, it took about 30 seconds
+if __name__ == '__main__':
+    #print(get_active_players())
+    create_players_database()
