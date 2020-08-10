@@ -7,7 +7,7 @@ from dbmanager import DbManager
 PlayerInfo = Tuple[str, str]  # player_id, name
 PlayerList = List[PlayerInfo]
 
-NBA_DB_NAME = "nba.db"
+NBA_DB = "nba.db"
 BASKETBALL_REFERENCE_BASE_URL = "https://www.basketball-reference.com/"
 BASKETBALL_REFERENCE_PLAYERS_BASE_URL = BASKETBALL_REFERENCE_BASE_URL + "players/"
 
@@ -39,10 +39,7 @@ def get_active_players() -> PlayerList:
     return player_list
 
 def create_players_database():
-    dbManager = DbManager(NBA_DB_NAME)  
-    if dbManager is None:
-        print("Error creating connection to DB")
-        return
+    dbManager = DbManager(NBA_DB)
 
     sql_create_players_table = """
         CREATE TABLE IF NOT EXISTS players (
