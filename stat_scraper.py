@@ -6,11 +6,13 @@ from dbmanager import DbManager
 
 PlayerInfo = Tuple[str, str]  # player_id, name
 PlayerList = List[PlayerInfo]
+PlayerIds  = List[str]
 
 NBA_DB = "nba.db"
 BASKETBALL_REFERENCE_BASE_URL = "https://www.basketball-reference.com/"
 BASKETBALL_REFERENCE_PLAYERS_BASE_URL = BASKETBALL_REFERENCE_BASE_URL + "players/"
 
+#region Scraping
 def get_active_players_by_letter(letter: str) -> PlayerList:
     assert len(letter) == 1
     assert letter.isalpha()
@@ -38,21 +40,57 @@ def get_active_players() -> PlayerList:
 
     return player_list
 
-def create_players_database():
-    dbManager = DbManager(NBA_DB)
+def get_player_stats(player_id: str, year: int = 2020):
+    assert year >= 2019 and year <= 2020
+    assert len(player_id) > 1
+    #
+    #url = BASKETBALL_REFERENCE_PLAYERS_BASE_URL + player_id[0] + "/" + player_id + "/gamelog/" + str(year)
 
+
+#region DB management
+def players_table_exists(db_manager: DbManager) -> bool:
+    player_table_query = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='players'"
+    return int(db_manager.execute(player_table_query).fetchone()[0]) == 1
+
+def create_players_table(db_manager: DbManager):
     sql_create_players_table = """
         CREATE TABLE IF NOT EXISTS players (
         id   text PRIMARY KEY,
         name text NOT NULL); """
 
-    if dbManager.execute(sql_create_players_table) is None:
+    if db_manager.execute(sql_create_players_table) is None:
         print("Error creating table")
 
-def update_players_database():
-    return
+def get_player_ids(db_manager: DbManager) -> PlayerIds:
+    get_ids_query = 'SELECT id FROM players'
+    result = db_manager.execute(get_ids_query)
+    player_ids = []
+    if result is not None:
+        player_ids = [player_id[0] for player_id in result.fetchall()]
+    
+    return player_ids
+
+def insert_player(db_manager: DbManager, player_info_tuple: PlayerInfo):
+    add_player_query = 'INSERT INTO players (id,name) VALUES (?, ?)'
+    db_manager.execute(add_player_query, player_info_tuple)
+#endregion
+
+
+def update_players_table():
+    db_manager = DbManager(NBA_DB)
+    
+    existing_player_ids = set()
+    if not players_table_exists(db_manager):
+        create_players_table(db_manager)
+    else:
+        existing_player_ids.update(get_player_ids(db_manager))
+
+    active_players = get_active_players_by_letter('a')
+    for player in active_players:
+        player_id = player[0]
+        if not player_id in existing_player_ids:
+            insert_player(db_manager, player)
 
 
 if __name__ == '__main__':
-    #print(get_active_players())
-    create_players_database()
+    update_players_table()
