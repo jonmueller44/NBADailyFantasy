@@ -3,6 +3,7 @@ from string import ascii_lowercase
 import urllib.request
 from typing import List, Tuple
 from dbmanager import DbManager
+import datetime
 
 PlayerInfo = Tuple[str, str]  # player_id, name
 PlayerList = List[PlayerInfo]
@@ -40,26 +41,62 @@ def get_active_players() -> PlayerList:
 
     return player_list
 
-def get_player_stats(player_id: str, year: int = 2020):
+def get_player_stats(player_id: str, year: int = 2020, last_updated = None):
     assert year >= 2019 and year <= 2020
     assert len(player_id) > 1
-    #
-    #url = BASKETBALL_REFERENCE_PLAYERS_BASE_URL + player_id[0] + "/" + player_id + "/gamelog/" + str(year)
+    
+    gamelog = []
 
+    url = BASKETBALL_REFERENCE_PLAYERS_BASE_URL + player_id[0] + "/" + player_id + "/gamelog/" + str(year)
+    html = urllib.request.urlopen(url).read()
+    soup = BeautifulSoup(html, 'html.parser')
 
+    table = soup.find('table')
+    player_game_log = table.find_all('pgl_basic')
+    
+    print(table)
+
+    
+    return gamelog
+    
+
+# Game Log Columns
+# *GameScore = Points + 1.2 * Rebounds + 1.5 * Assists + 3 * (Blocks + Steals) - Turnovers
+# TeamGameNumber, PlayerGameNumber, Date, Team, Opponent, GameStarted, MinutesPlayed, FG, FGA, 3P, 3PA, FT, FTA, OffensiveRebounds, DefensiveRebounds, TotalRebounds, Assists, Steals, Blocks, Turnovers, Fouls, Points, PlusMinus, GameScore*
 #region DB management
+
+def table_exists(db_manager: DbManager, table_name: str) -> bool:
+    table_query = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='{}}'".format(table_name)
+    return int(db_manager.execute(table_query).fetchone()[0]) == 1
+
 def players_table_exists(db_manager: DbManager) -> bool:
-    player_table_query = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='players'"
-    return int(db_manager.execute(player_table_query).fetchone()[0]) == 1
+    return table_exists(db_manager, 'players')
+
+def game_logs_table_exists(db_manager: DbManager) -> bool:
+    return table_exists(db_manager, 'game_logs')
 
 def create_players_table(db_manager: DbManager):
     sql_create_players_table = """
         CREATE TABLE IF NOT EXISTS players (
-        id   text PRIMARY KEY,
-        name text NOT NULL); """
+        id   TEXT PRIMARY KEY,
+        name TEXT NOT NULL);
+        """
 
     if db_manager.execute(sql_create_players_table) is None:
         print("Error creating table")
+
+def create_game_logs_table(db_manager: DbManager):
+    sql_create_game_logs_table = """
+    CREATE TABLE IF NOT EXISTS game_logs (
+    team_game_number INTEGER,
+    player_game_number INTEGER,
+    date INTEGER,
+    team TEXT,
+    opponent TEXT,
+    game_started INTEGER,
+    
+    )
+    """
 
 def get_player_ids(db_manager: DbManager) -> PlayerIds:
     get_ids_query = 'SELECT id FROM players'
@@ -69,6 +106,7 @@ def get_player_ids(db_manager: DbManager) -> PlayerIds:
         player_ids = [player_id[0] for player_id in result.fetchall()]
     
     return player_ids
+
 
 def insert_player(db_manager: DbManager, player_info_tuple: PlayerInfo):
     add_player_query = 'INSERT INTO players (id,name) VALUES (?, ?)'
@@ -93,4 +131,4 @@ def update_players_table():
 
 
 if __name__ == '__main__':
-    update_players_table()
+    get_player_stats('jamesle01',2020)
