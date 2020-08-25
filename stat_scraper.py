@@ -4,6 +4,7 @@ import urllib.request
 from typing import List, Tuple
 from dbmanager import DbManager
 import datetime
+import re
 
 PlayerInfo = Tuple[str, str]  # player_id, name
 PlayerList = List[PlayerInfo]
@@ -45,19 +46,28 @@ def get_player_stats(player_id: str, year: int = 2020, last_updated = None):
     assert year >= 2019 and year <= 2020
     assert len(player_id) > 1
     
-    gamelog = []
+    playerlog_lastfive = []
 
     url = BASKETBALL_REFERENCE_PLAYERS_BASE_URL + player_id[0] + "/" + player_id + "/gamelog/" + str(year)
     html = urllib.request.urlopen(url).read()
     soup = BeautifulSoup(html, 'html.parser')
 
-    table = soup.find('table')
-    player_game_log = table.find_all('pgl_basic')
+    player_game_log = soup.find('div', {'id': "all_pgl_basic"})
+    player_game_log_row = player_game_log.find_all('tr', {"id": re.compile("^pgl_basic")})
     
-    print(table)
+    for row in range(-5,0):
+        
+        row_data_stat = player_game_log_row[row]
+        
+        data_tuple = []
+        
+        #for data in row_data_stat:
+            #data_tuple.append(data.name('data_stat'))
+        
+        #playerlog_lastfive.append(data_tuple)
 
-    
-    return gamelog
+    #print (playerlog_lastfive)
+    return playerlog_lastfive
     
 
 # Game Log Columns
