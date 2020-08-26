@@ -59,14 +59,14 @@ def get_player_stats(player_id: str, year: int = 2020, last_updated = None):
         
         row_data_stat = player_game_log_row[row]
         
-        data_tuple = []
-        
-        #for data in row_data_stat:
-            #data_tuple.append(data.name('data_stat'))
-        
-        #playerlog_lastfive.append(data_tuple)
+        game_stats = []
 
-    #print (playerlog_lastfive)
+        for string in row_data_stat.strings:
+            game_stats.append(string)
+        
+        playerlog_lastfive.append(game_stats)
+
+    print (playerlog_lastfive)
     return playerlog_lastfive
     
 
