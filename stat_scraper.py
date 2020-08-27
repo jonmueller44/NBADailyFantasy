@@ -5,6 +5,7 @@ from typing import List, Tuple, Any
 from dbmanager import DbManager
 import datetime
 import re
+import time
 
 PlayerInfo = Tuple[str, str]  # player_id, name
 PlayerList = List[PlayerInfo]
@@ -42,22 +43,67 @@ def get_active_players() -> PlayerList:
 
     return player_list
 
-def sanitize_player_stats(stats: List[str]) -> List[Any]:
+def sanitize_player_stats(stats: List[str], player_id: str, season: int, is_playoffs: bool = False) -> Tuple[Any]:
     sanitized_stats = []
     idx = 0
-    # team/player game number
+    # player_id
+    sanitized_stats.append(player_id)
+    # team_game_number, player_game_number
     sanitized_stats.extend([int(stat) for stat in stats[:2]])
-    #date
+    # is_playoffs
+    sanitized_stats.append(1 if is_playoffs else 0)
+    # season, date
     ymd = [int(val) for val in stats[2].split('-')]
+    sanitized_stats.append(season)
     sanitized_stats.append(datetime.date(ymd[0], ymd[1], ymd[2]))
     # team
     sanitized_stats.append(stats[4])
     # at_home
-    sanitized_stats.append(0 if stats[5] == '@' else 1)
+    if stats[5] == '@':
+        sanitized_stats.append(0)
+        idx = 6
+    else:
+        sanitized_stats.append(1)
+        idx = 5
+    # opponent
+    sanitized_stats.append(stats[idx])
+    # game_started
+    idx += 2
+    sanitized_stats.append(int(stats[idx]))
+    # seconds_played
+    idx += 1
+    minutes_played = [int(val) for val in stats[idx].split(':')]
+    sanitized_stats.append(minutes_played[0] * 60 + minutes_played[1])
+    # field_goals/field_goal_attempts, three_points/three_point_attempts, free_throws/free_throw_attempts
+    for _ in range(3):
+        idx += 1
+        sanitized_stats.append(int(stats[idx]))
 
-    return sanitized_stats
+        idx += 1
+        attempts = int(stats[idx])
+        sanitized_stats.append(attempts)
+        if attempts > 0:
+            idx += 1
+    # offensive_rebounds
+    idx += 1
+    sanitized_stats.append(int(stats[idx]))
+    # defensive_rebounds
+    idx += 1
+    sanitized_stats.append(int(stats[idx]))
+    idx += 1 # skip total rebounds
+    # assists, steals, blocks, turnovers, fouls, points
+    for i in range(idx + 1, idx + 7, 1):
+        sanitized_stats.append(int(stats[i]))
+    # plus_minus
+    idx += 8
+    sanitized_stats.append(0 if idx >= len(stats) else int(stats[idx]))
+    # fanduel_score
+    fanduel_score = sanitized_stats[-2] + 1.2 * (sanitized_stats[-8] + sanitized_stats[-9]) + 1.5 * sanitized_stats[-7] + 3 * (sanitized_stats[-5] + sanitized_stats[-6]) - sanitized_stats[-4]
+    sanitized_stats.append(fanduel_score)
 
-def get_player_stats(player_id: str, year: int = 2020, last_updated: str = '') -> List[str]:
+    return tuple(sanitized_stats)
+
+def get_player_stats(player_id: str, year: int = 2020, last_updated: str = '') -> List[Tuple[Any]]:
     assert year >= 2019 and year <= 2020
     assert len(player_id) > 1
     
@@ -68,62 +114,82 @@ def get_player_stats(player_id: str, year: int = 2020, last_updated: str = '') -
     soup = BeautifulSoup(html, 'html.parser')
 
     player_game_log = soup.find('div', {'id': "all_pgl_basic"})
+    if player_game_log is None:
+        return player_game_logs
     player_game_log_rows = player_game_log.find_all('tr', {"id": re.compile("^pgl_basic")})
     
     for game_log in player_game_log_rows:
         game_stats = []
         for stat in game_log.strings:
             game_stats.append(stat)
-
-        # add entry 
         
-        player_game_logs.append(game_stats)
-        print(game_stats)
-        print(sanitize_player_stats(game_stats))
+        player_game_logs.append(sanitize_player_stats(game_stats, player_id, year))
 
     return player_game_logs
     
 
-# Game Log Columns
-# *GameScore = Points + 1.2 * Rebounds + 1.5 * Assists + 3 * (Blocks + Steals) - Turnovers
-# TeamGameNumber, PlayerGameNumber, Date, Team, AtHome, Opponent, GameStarted, MinutesPlayed, FG, FGA, 3P, 3PA, FT, FTA, OffensiveRebounds, DefensiveRebounds, TotalRebounds, Assists, Steals, Blocks, Turnovers, Fouls, Points, PlusMinus, GameScore*
 #region DB management
+# Game Log Columns
+# fanduel_score = points + 1.2 * rebounds + 1.5 * assists + 3 * (blocks + steals) - turnovers
+# player_id, team_game_number, player_game_number, is_playoffs, season, date, team, at_home, opponent, game_started, seconds_played, field_goals, field_goal_attempts, three_points, three_point_attempts, free_throws, free_throw_attempts, offensive_rebounds, defensive_rebounds, assists, steals, blocks, turnovers, fouls, points, plus_minus, fanduel_score
 
 def table_exists(db_manager: DbManager, table_name: str) -> bool:
-    table_query = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='{}}'".format(table_name)
+    table_query = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='{}'".format(table_name)
     return int(db_manager.execute(table_query).fetchone()[0]) == 1
 
 def players_table_exists(db_manager: DbManager) -> bool:
-    return table_exists(db_manager, 'players')
+    return table_exists(db_manager, 'Players')
 
 def game_logs_table_exists(db_manager: DbManager) -> bool:
-    return table_exists(db_manager, 'game_logs')
+    return table_exists(db_manager, 'GameLogs')
 
 def create_players_table(db_manager: DbManager):
     sql_create_players_table = """
-        CREATE TABLE IF NOT EXISTS players (
+        CREATE TABLE IF NOT EXISTS Players (
         id   TEXT PRIMARY KEY,
         name TEXT NOT NULL);
         """
 
     if db_manager.execute(sql_create_players_table) is None:
-        print("Error creating table")
+        print("Error creating Players table.")
 
 def create_game_logs_table(db_manager: DbManager):
     sql_create_game_logs_table = """
-    CREATE TABLE IF NOT EXISTS game_logs (
-    team_game_number INTEGER,
-    player_game_number INTEGER,
-    date INTEGER,
-    team TEXT,
-    opponent TEXT,
-    game_started INTEGER,
-    
-    )
-    """
+    CREATE TABLE IF NOT EXISTS GameLogs (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id            TEXT,
+    team_game_number     INTEGER,
+    player_game_number   INTEGER,
+    is_playoffs          INTEGER,
+    season               INTEGER,
+    date                 DATE,
+    team                 TEXT,
+    at_home              INTEGER,
+    opponent             TEXT,
+    game_started         INTEGER,
+    seconds_played       INTEGER,
+    field_goals          INTEGER,
+    field_goal_attempts  INTEGER,
+    three_points         INTEGER,
+    three_point_attempts INTEGER,
+    free_throws          INTEGER,
+    free_throw_attempts  INTEGER,
+    offensive_rebounds   INTEGER,
+    defensive_rebounds   INTEGER,
+    assists              INTEGER,
+    steals               INTEGER,
+    blocks               INTEGER,
+    turnovers            INTEGER,
+    fouls                INTEGER,
+    points               INTEGER,
+    plus_minus           INTEGER,
+    fanduel_score        REAL) """
+
+    if db_manager.execute(sql_create_game_logs_table) is None:
+        print("Error creating GameLogs table.")
 
 def get_player_ids(db_manager: DbManager) -> PlayerIds:
-    get_ids_query = 'SELECT id FROM players'
+    get_ids_query = 'SELECT id FROM Players'
     result = db_manager.execute(get_ids_query)
     player_ids = []
     if result is not None:
@@ -133,8 +199,12 @@ def get_player_ids(db_manager: DbManager) -> PlayerIds:
 
 
 def insert_player(db_manager: DbManager, player_info_tuple: PlayerInfo):
-    add_player_query = 'INSERT INTO players (id,name) VALUES (?, ?)'
-    db_manager.execute(add_player_query, player_info_tuple)
+    insert_player_query = 'INSERT INTO Players (id,name) VALUES (?, ?)'
+    db_manager.execute(insert_player_query, player_info_tuple)
+
+def insert_game_log(db_manager: DbManager, game_log_tuple: Tuple[Any]):
+    insert_game_log_query = 'INSERT INTO GameLogs VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    db_manager.execute(insert_game_log_query, game_log_tuple)
 #endregion
 
 
@@ -146,13 +216,22 @@ def update_players_table():
         create_players_table(db_manager)
     else:
         existing_player_ids.update(get_player_ids(db_manager))
+    
+    if not game_logs_table_exists(db_manager):
+        create_game_logs_table(db_manager)
 
-    active_players = get_active_players_by_letter('a')
+    active_players = get_active_players()
     for player in active_players:
+        time.sleep(1)
         player_id = player[0]
+        print(player_id)
         if not player_id in existing_player_ids:
             insert_player(db_manager, player)
+    
+        stats = get_player_stats(player_id, 2020)
+        for game_log in stats:
+            insert_game_log(db_manager, game_log)
 
 
 if __name__ == '__main__':
-    get_player_stats('kuzmaky01', 2020)
+    update_players_table()

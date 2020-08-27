@@ -3,7 +3,7 @@ from typing import Tuple, Any
 
 class DbManager():
     def __init__(self, db: str):
-        self.connection = sqlite3.connect(db)
+        self.connection = sqlite3.connect(db, detect_types=sqlite3.PARSE_DECLTYPES)
         self.cursor = self.connection.cursor()
 
     def __del__(self):
