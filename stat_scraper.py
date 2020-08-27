@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 from string import ascii_lowercase
 import urllib.request
-from typing import List, Tuple
+from typing import List, Tuple, Any
 from dbmanager import DbManager
 import datetime
 import re
@@ -42,37 +42,51 @@ def get_active_players() -> PlayerList:
 
     return player_list
 
-def get_player_stats(player_id: str, year: int = 2020, last_updated = None):
+def sanitize_player_stats(stats: List[str]) -> List[Any]:
+    sanitized_stats = []
+    idx = 0
+    # team/player game number
+    sanitized_stats.extend([int(stat) for stat in stats[:2]])
+    #date
+    ymd = [int(val) for val in stats[2].split('-')]
+    sanitized_stats.append(datetime.date(ymd[0], ymd[1], ymd[2]))
+    # team
+    sanitized_stats.append(stats[4])
+    # at_home
+    sanitized_stats.append(0 if stats[5] == '@' else 1)
+
+    return sanitized_stats
+
+def get_player_stats(player_id: str, year: int = 2020, last_updated: str = '') -> List[str]:
     assert year >= 2019 and year <= 2020
     assert len(player_id) > 1
     
-    playerlog_lastfive = []
+    player_game_logs = []
 
     url = BASKETBALL_REFERENCE_PLAYERS_BASE_URL + player_id[0] + "/" + player_id + "/gamelog/" + str(year)
     html = urllib.request.urlopen(url).read()
     soup = BeautifulSoup(html, 'html.parser')
 
     player_game_log = soup.find('div', {'id': "all_pgl_basic"})
-    player_game_log_row = player_game_log.find_all('tr', {"id": re.compile("^pgl_basic")})
+    player_game_log_rows = player_game_log.find_all('tr', {"id": re.compile("^pgl_basic")})
     
-    for row in range(-5,0):
-        
-        row_data_stat = player_game_log_row[row]
-        
+    for game_log in player_game_log_rows:
         game_stats = []
+        for stat in game_log.strings:
+            game_stats.append(stat)
 
-        for string in row_data_stat.strings:
-            game_stats.append(string)
+        # add entry 
         
-        playerlog_lastfive.append(game_stats)
+        player_game_logs.append(game_stats)
+        print(game_stats)
+        print(sanitize_player_stats(game_stats))
 
-    print (playerlog_lastfive)
-    return playerlog_lastfive
+    return player_game_logs
     
 
 # Game Log Columns
 # *GameScore = Points + 1.2 * Rebounds + 1.5 * Assists + 3 * (Blocks + Steals) - Turnovers
-# TeamGameNumber, PlayerGameNumber, Date, Team, Opponent, GameStarted, MinutesPlayed, FG, FGA, 3P, 3PA, FT, FTA, OffensiveRebounds, DefensiveRebounds, TotalRebounds, Assists, Steals, Blocks, Turnovers, Fouls, Points, PlusMinus, GameScore*
+# TeamGameNumber, PlayerGameNumber, Date, Team, AtHome, Opponent, GameStarted, MinutesPlayed, FG, FGA, 3P, 3PA, FT, FTA, OffensiveRebounds, DefensiveRebounds, TotalRebounds, Assists, Steals, Blocks, Turnovers, Fouls, Points, PlusMinus, GameScore*
 #region DB management
 
 def table_exists(db_manager: DbManager, table_name: str) -> bool:
@@ -141,4 +155,4 @@ def update_players_table():
 
 
 if __name__ == '__main__':
-    get_player_stats('jamesle01',2020)
+    get_player_stats('kuzmaky01', 2020)
