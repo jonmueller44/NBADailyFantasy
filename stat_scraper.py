@@ -143,6 +143,9 @@ def players_table_exists(db_manager: DbManager) -> bool:
 def game_logs_table_exists(db_manager: DbManager) -> bool:
     return table_exists(db_manager, 'GameLogs')
 
+def last_updated_table_exists(db_manager: DbManager) -> bool:
+    return table_exists(db_manager, 'LastUpdated')
+
 def create_players_table(db_manager: DbManager):
     sql_create_players_table = """
         CREATE TABLE IF NOT EXISTS Players (
@@ -188,6 +191,22 @@ def create_game_logs_table(db_manager: DbManager):
     if db_manager.execute(sql_create_game_logs_table) is None:
         print("Error creating GameLogs table.")
 
+def create_last_updated_table():
+    sql_create_last_updated_table = """
+        CREATE TABLE IF NOT EXISTS LastUpdated (
+        date   TEXT);
+        """
+
+    if db_manager.execute(sql_create_last_updated_table) is None:
+        print("Error creating LastUpdated table.")
+
+def drop_last_updated_table():
+    sql_drop_last_updated_table = """
+        DROP TABLE LastUpdated
+        """
+       if db_manager.execute(sql_drop_last_updated_table) is None:
+           print("Error dropping LastUpdated table.")
+
 def get_player_ids(db_manager: DbManager) -> PlayerIds:
     get_ids_query = 'SELECT id FROM Players'
     result = db_manager.execute(get_ids_query)
@@ -197,6 +216,9 @@ def get_player_ids(db_manager: DbManager) -> PlayerIds:
     
     return player_ids
 
+def get_last_updated(db_manager: DbManager):
+    get_date_query = 'SELECT date FROM LastUpdated'
+    return db_manager.execute(get_date_query)     
 
 def insert_player(db_manager: DbManager, player_info_tuple: PlayerInfo):
     insert_player_query = 'INSERT INTO Players (id,name) VALUES (?, ?)'
@@ -206,6 +228,16 @@ def insert_game_log(db_manager: DbManager, game_log_tuple: Tuple[Any]):
     insert_game_log_query = 'INSERT INTO GameLogs VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     db_manager.execute(insert_game_log_query, game_log_tuple)
 #endregion
+
+def update_last_updated():
+    db_manager = DbManager(NBA_DB)
+    if not last_updated_table_exists(db_manager):
+        create_last_updated_table(db_manager)
+    else:
+        drop_last_updated_table(db_manager)   
+
+    insert_last_updated_query = 'INSERT INTO LastUpdated (id) VALUES (?)'
+    db_manager.execute(insert_last_updated_query,date.today())
 
 
 def update_players_table():
@@ -231,6 +263,8 @@ def update_players_table():
         stats = get_player_stats(player_id, 2020)
         for game_log in stats:
             insert_game_log(db_manager, game_log)
+
+            
 
 
 if __name__ == '__main__':
