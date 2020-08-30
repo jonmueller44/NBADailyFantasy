@@ -191,7 +191,7 @@ def create_game_logs_table(db_manager: DbManager):
     if db_manager.execute(sql_create_game_logs_table) is None:
         print("Error creating GameLogs table.")
 
-def create_last_updated_table():
+def create_last_updated_table(db_manager: DbManager):
     sql_create_last_updated_table = """
         CREATE TABLE IF NOT EXISTS LastUpdated (
         date   TEXT);
@@ -200,12 +200,10 @@ def create_last_updated_table():
     if db_manager.execute(sql_create_last_updated_table) is None:
         print("Error creating LastUpdated table.")
 
-def drop_last_updated_table():
-    sql_drop_last_updated_table = """
-        DROP TABLE LastUpdated
-        """
-       if db_manager.execute(sql_drop_last_updated_table) is None:
-           print("Error dropping LastUpdated table.")
+def drop_last_updated_table(db_manager: DbManager):
+    sql_drop_last_updated_table = 'DROP TABLE LastUpdated'
+    if db_manager.execute(sql_drop_last_updated_table) is None:
+        print("Error dropping LastUpdated table.")
 
 def get_player_ids(db_manager: DbManager) -> PlayerIds:
     get_ids_query = 'SELECT id FROM Players'
@@ -237,7 +235,7 @@ def update_last_updated():
         drop_last_updated_table(db_manager)   
 
     insert_last_updated_query = 'INSERT INTO LastUpdated (id) VALUES (?)'
-    db_manager.execute(insert_last_updated_query,date.today())
+    db_manager.execute(insert_last_updated_query, datetime.datetime.now())
 
 
 def update_players_table():
